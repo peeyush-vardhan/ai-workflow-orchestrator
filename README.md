@@ -24,9 +24,9 @@
 │   Researcher Agent   │   │    Writer Agent      │
 │  temp: 0.4           │──▶│  temp: 0.7           │
 │  Finds facts/trends  │   │  Drafts polished docs│
-└──────────────────────┘   └───────────┬──────────┘
-                                       │
-                             task_3    ▼ (depends on task_2)
+└──────────────────────┘   └──────────┬───────────┘
+                                      │
+                             task_3   ▼ (depends on task_2)
                            ┌──────────────────────┐
                            │   Reviewer Agent     │
                            │  temp: 0.2           │
@@ -38,9 +38,9 @@
                           │   Executor Agent     │
                           │  temp: 0.1           │
                           │  Final deliverable   │
-                          └──────────┬───────────┘
-                                     │
-                                     ▼
+                          └───────────┬──────────┘
+                                      │
+                                      ▼
                           ┌──────────────────────┐
                           │    Final Output      │
                           │  Publication-ready   │
