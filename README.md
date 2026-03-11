@@ -2,6 +2,8 @@
 
 > A multi-agent task automation platform that decomposes natural language workflows into executable DAGs and runs them through specialized AI agents.
 
+![Demo](demo/demo.gif)
+
 ---
 
 ## Architecture
