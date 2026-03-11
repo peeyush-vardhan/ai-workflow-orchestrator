@@ -27,24 +27,24 @@
 └──────────────────────┘   └───────────┬──────────┘
                                        │
                              task_3    ▼ (depends on task_2)
-                    ┌──────────────────────┐
-                    │   Reviewer Agent     │
-                    │  temp: 0.2           │
-                    │  Quality score 1-5   │
-                    └──────────┬───────────┘
-                               │
-                     task_4    ▼ (depends on task_3)
-                    ┌──────────────────────┐
-                    │   Executor Agent     │
-                    │  temp: 0.1           │
-                    │  Final deliverable   │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │    Final Output      │
-                    │  Publication-ready   │
-                    └──────────────────────┘
+                           ┌──────────────────────┐
+                           │   Reviewer Agent     │
+                           │  temp: 0.2           │
+                           │  Quality score 1-5   │
+                           └──────────┬───────────┘
+                                      │
+                            task_4    ▼ (depends on task_3)
+                          ┌──────────────────────┐
+                          │   Executor Agent     │
+                          │  temp: 0.1           │
+                          │  Final deliverable   │
+                          └──────────┬───────────┘
+                                     │
+                                     ▼
+                          ┌──────────────────────┐
+                          │    Final Output      │
+                          │  Publication-ready   │
+                          └──────────────────────┘
 ```
 
 ---
