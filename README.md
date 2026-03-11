@@ -14,16 +14,16 @@
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Decomposition Engine                          │
-│  LLM analyzes intent → generates DAG of 2-8 subtasks           │
+│                    Decomposition Engine                         │
+│  LLM analyzes intent → generates DAG of 2-8 subtasks            │
 │  Validates: no cycles, valid deps, 1-8 tasks, valid agents      │
 └─────────────────┬──────────────────────┬────────────────────────┘
                   │                      │
            task_1 ▼               task_2 ▼ (depends on task_1)
 ┌──────────────────────┐   ┌──────────────────────┐
-│   Researcher Agent   │   │    Writer Agent       │
-│  temp: 0.4          │──▶│  temp: 0.7            │
-│  Finds facts/trends  │   │  Drafts polished docs │
+│   Researcher Agent   │   │    Writer Agent      │
+│  temp: 0.4           │──▶│  temp: 0.7           │
+│  Finds facts/trends  │   │  Drafts polished docs│
 └──────────────────────┘   └──────────┬───────────┘
                                        │
                              task_3 ▼ (depends on task_2)
