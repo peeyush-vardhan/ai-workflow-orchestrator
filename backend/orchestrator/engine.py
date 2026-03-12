@@ -136,7 +136,13 @@ class WorkflowEngine:
                 self._emit("task_completed", {
                     "task_id": task.id,
                     "agent_type": task.agent_type.value,
+                    "full_output": task.output or "",
                     "output_preview": (task.output or "")[:200],
+                    "cumulative_tokens": (
+                        state.token_metrics.total_input_tokens
+                        + state.token_metrics.total_output_tokens
+                    ),
+                    "cumulative_cost": state.token_metrics.estimated_cost,
                 })
 
             except LLMError as e:

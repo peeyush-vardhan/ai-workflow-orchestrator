@@ -28,9 +28,9 @@ const GLOBAL_STYLES = `
   @keyframes dashFlow {
     to { stroke-dashoffset: -28; }
   }
-  @keyframes progressFill {
-    from { width: 0%; }
-    to   { width: 100%; }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
   }
   @keyframes scanline {
     0%   { transform: translateY(-100%); opacity: 0; }
@@ -68,10 +68,10 @@ const C = {
 
 // ─── Agent definitions ──────────────────────────────────────────────────────
 const AGENTS = [
-  { id: 'researcher', name: 'Researcher', icon: '◎', color: C.blue,   temp: 0.4, delayMs: 1400, tokIn: 920,  tokOut: 640 },
-  { id: 'writer',     name: 'Writer',     icon: '◈', color: C.purple, temp: 0.7, delayMs: 1800, tokIn: 1240, tokOut: 820 },
-  { id: 'reviewer',   name: 'Reviewer',   icon: '◉', color: C.orange, temp: 0.2, delayMs: 1200, tokIn: 1560, tokOut: 480 },
-  { id: 'executor',   name: 'Executor',   icon: '◆', color: C.green,  temp: 0.1, delayMs: 1600, tokIn: 1820, tokOut: 760 },
+  { id: 'researcher', name: 'Researcher', icon: '◎', color: C.blue,   temp: 0.4 },
+  { id: 'writer',     name: 'Writer',     icon: '◈', color: C.purple, temp: 0.7 },
+  { id: 'reviewer',   name: 'Reviewer',   icon: '◉', color: C.orange, temp: 0.2 },
+  { id: 'executor',   name: 'Executor',   icon: '◆', color: C.green,  temp: 0.1 },
 ]
 
 // ─── Demo templates ─────────────────────────────────────────────────────────
@@ -89,186 +89,6 @@ const TEMPLATES = [
     input: 'Analyze current trends in remote work adoption since 2020 — productivity data, employee preferences, company policies, and economic impacts. Produce an executive report with strategic recommendations for HR leaders.',
   },
 ]
-
-// ─── Realistic mock outputs ──────────────────────────────────────────────────
-const MOCK = {
-  researcher: `## Research Findings
-
-### Executive Overview
-After extensive analysis of the requested topic, findings have been compiled from **23 authoritative sources** including peer-reviewed journals, industry reports (Gartner, McKinsey, Forrester), and expert interviews conducted Q4 2024.
-
-### Key Discoveries
-
-**1. Market Trajectory**
-The domain is experiencing **34% year-over-year growth**, with total addressable market projected at **$847B by 2027**. Early adopters report an average **2.4x efficiency multiplier** within 18 months of full deployment.
-
-**2. Technology Adoption Curve**
-- 78% of Fortune 500 organizations are actively investing in automation infrastructure
-- ROI averaging **156%** within first 18 months post-implementation
-- Skill demand outpacing supply **3:1** — creating significant talent pressure across the industry
-
-**3. Competitive Differentiation Signals**
-Organizations with mature AI strategies demonstrate measurable advantages:
-- 67% reduction in operational overhead (Gartner, 2024)
-- 42% improvement in customer satisfaction scores (NPS delta)
-- 28% faster time-to-market for new product launches
-
-### Critical Data Points
-
-| Metric | Value | Source | Confidence |
-|--------|-------|--------|-----------|
-| Cost reduction | 67% | Gartner | High |
-| Satisfaction lift | +42 NPS | McKinsey | High |
-| Time-to-market | -28% | IDC | Medium |
-| Talent gap ratio | 3:1 | LinkedIn | High |
-| 36-month ROI | 180% | Forrester | Medium |
-
-### Risk Factors
-- Integration complexity varies 4x by organizational maturity level
-- Data privacy regulations affect 45% of potential implementations globally
-- Legacy system technical debt creates 60% of delays in large enterprises
-
-### Confidence Assessment
-- Quantitative findings: **85–92%** confidence
-- Trend projections (3yr horizon): **70–80%** confidence
-- Market size estimates: **75–85%** confidence`,
-
-  writer: `## Executive Summary
-
-Organizations that decisively integrate AI into core operations are establishing **durable competitive advantages** that compound over time. This report synthesizes research findings into a clear strategic framework for leadership teams ready to act.
-
----
-
-### The Strategic Imperative
-
-The data is unambiguous: a **34% growth rate** and **$847B market opportunity** signal that the window for first-mover advantage is narrowing rapidly. Companies that delay risk becoming permanent followers in a landscape defined by AI-native competitors.
-
-### Recommended Strategic Framework
-
-**Phase 1 — Foundation** *(Months 1–3)*
-Establish AI governance, identify top-5 use cases by ROI potential, and secure executive sponsorship with clear accountability structures. Invest in baseline measurement.
-
-**Phase 2 — Pilot and Learn** *(Months 4–9)*
-Launch 3 high-ROI pilots with rigorous measurement. Target the 67% cost-reduction opportunities first — these deliver the clearest signal to skeptical stakeholders.
-
-**Phase 3 — Scale** *(Months 10–18)*
-Roll out proven pilots enterprise-wide. Build proprietary data advantages that competitors cannot easily replicate.
-
-### Financial Projections
-
-| Scenario | 36-Month ROI | Breakeven | Confidence |
-|----------|-------------|-----------|-----------|
-| Conservative | 150% | Month 18 | 90% |
-| **Base Case** | **180%** | **Month 14** | 75% |
-| Optimistic | 240% | Month 10 | 55% |
-
-### Key Performance Indicators
-- **Primary**: Operational cost reduction (target: 40–67%)
-- **Secondary**: Customer satisfaction delta (target: +30 NPS)
-- **Leading indicator**: AI adoption rate across BUs (target: 60% in 12 months)
-
-### Conclusion
-The organizations that will lead the next decade are making these investments today. The strategic path forward is clear, the financial case is compelling, and the risk of inaction now exceeds the risk of execution.`,
-
-  reviewer: `## Quality Score: 4.2 / 5.0
-
-### Assessment Summary
-This report demonstrates strong analytical foundations and presents findings with commendable clarity. The strategic framework is sound and actionable. Several targeted improvements will elevate this from good to exceptional before distribution.
-
----
-
-### Strengths ✓
-
-**Content Quality** — *4.5 / 5.0*
-- Research is comprehensive with 23 cited sources spanning multiple methodologies
-- Quantitative data is properly attributed and contextualized throughout
-- Recommendations are specific, measurable, and time-bound with clear owners
-
-**Strategic Framework** — *4.3 / 5.0*
-- Three-phase implementation is realistic and logically sequenced
-- Financial projections use an appropriate range of scenarios with confidence intervals
-- KPIs are tied directly to business outcomes, not vanity metrics
-
-**Clarity and Structure** — *4.4 / 5.0*
-- Executive summary effectively captures decision-relevant content for C-suite
-- Tables significantly improve scannability of dense data
-- Logical flow from problem → evidence → solution → measurement
-
----
-
-### Issues Identified ⚠
-
-**Minor (address before final distribution)**
-1. Financial projections lack sensitivity analysis for macroeconomic downturns
-2. Implementation timeline assumes greenfield — needs a legacy-system adjustment factor (+20%)
-3. Stakeholder communication plan is referenced but not detailed anywhere
-
-**Suggestions for Improvement**
-- Add a 2-page risk mitigation appendix with specific contingency triggers
-- Include 2–3 brief case studies from comparable organizations
-- Specify change management budget explicitly (recommend 15% of total investment)
-
----
-
-### Fact-Check Results
-- Market size ($847B by 2027): **VERIFIED** ✓ — Gartner Q3 2024 Research Note
-- ROI claim (156% / 18 months): **VERIFIED** ✓ — Forrester Wave Report 2024
-- Talent gap (3:1 ratio): **VERIFIED** ✓ — LinkedIn Global Workforce Report 2024
-- Cost reduction (67%): **VERIFIED** ✓ — McKinsey Global Survey on AI Adoption
-
-### Final Recommendation
-**APPROVED with minor revisions.** Core content is publication-ready. Address the 3 flagged items before distribution to avoid credibility gaps with technical audiences.`,
-
-  executor: `## Final Deliverable — AI Strategic Integration Report
-
-**Status**: ✅ Publication Ready · Version 2.0 (Post-Review Revision)
-**Classification**: Executive Distribution
-**Prepared by**: AI Workflow Orchestrator · 4-Agent Sequential Pipeline
-
----
-
-## AI Strategic Integration: A Leadership Playbook
-
-### The Opportunity
-
-A **$847 billion market transformation** is underway. Organizations that build AI capabilities now will compound advantages that late entrants cannot close. Data from 23 independent research sources is unambiguous: this is not a question of *whether* to act, but *how decisively*.
-
-### Three-Phase Implementation Roadmap
-
-| Phase | Timeline | Investment | Expected Return |
-|-------|----------|-----------|----------------|
-| **Foundation** | Months 1–3 | Baseline | Governance + capabilities |
-| **Pilot and Learn** | Months 4–9 | +15% | First measurable ROI signals |
-| **Scale** | Months 10–18 | +35% | **180% cumulative ROI** |
-
-### Quantified Outcomes (Base Case)
-
-- **67%** reduction in target operational costs within 18 months
-- **+42 NPS** improvement in customer satisfaction scores
-- **28%** faster time-to-market for new product launches
-- **Breakeven**: Month 14 (conservative: Month 18)
-- **36-Month ROI**: 180% base case (range: 150%–240%)
-
-### Risk-Adjusted Implementation Notes
-
-**Technical Risk** — Mitigated by phased rollout with defined rollback checkpoints at each phase gate
-**Change Management** — Budget 15% of total investment; appoint a dedicated change lead with C-suite access
-**Regulatory Risk** — Schedule legal review gate at each phase boundary before scaling
-**Legacy Integration** — Add 20% timeline buffer for organizations with >1,000 employees or systems >10 years old
-
-### Immediate Next Steps
-
-1. **Week 1–2**: Secure C-suite sponsorship and formal resource commitment
-2. **Week 3–4**: Complete current-state assessment and use-case prioritization matrix
-3. **Month 2**: Launch Pilot 1 targeting highest-ROI identified use case
-4. **Month 3**: First metrics review; gate decision for Phase 2 launch
-
----
-
-*This report integrates findings from Researcher, Writer, and Reviewer agents. All claims independently verified against primary sources. Ready for executive distribution without further revision.*
-
-**AI Workflow Orchestrator** · Sequential DAG Execution · Quality Reviewed ✓`,
-}
 
 // ─── Lightweight markdown renderer ──────────────────────────────────────────
 function MD({ text }) {
@@ -327,7 +147,6 @@ function MD({ text }) {
   while (i < lines.length) {
     const line = lines[i]
 
-    // Table detection
     if (line.trim().startsWith('|')) {
       tableRows.push(line)
       i++
@@ -382,12 +201,10 @@ function DAGPipeline({ activeIdx, doneIdxs }) {
         </marker>
       </defs>
 
-      {/* Grid lines for mission-control feel */}
       {[40, 80, 120].map(y => (
         <line key={y} x1="0" y1={y} x2="660" y2={y} stroke={C.border} strokeWidth="0.5" strokeOpacity="0.4" />
       ))}
 
-      {/* Connector lines */}
       {[0, 1, 2].map(i => {
         const x1 = cx[i] + 32, x2 = cx[i + 1] - 32
         const done = doneIdxs.includes(i) && doneIdxs.includes(i + 1)
@@ -406,7 +223,6 @@ function DAGPipeline({ activeIdx, doneIdxs }) {
         )
       })}
 
-      {/* Nodes */}
       {AGENTS.map((a, i) => {
         const x = cx[i]
         const isActive = activeIdx === i
@@ -416,17 +232,14 @@ function DAGPipeline({ activeIdx, doneIdxs }) {
 
         return (
           <g key={a.id} transform={`translate(${x},${cy})`}>
-            {/* Ambient glow for active */}
             {isActive && (
               <circle r="52" fill={`url(#rg-${a.id})`}
                 style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
             )}
-            {/* Done shimmer */}
             {isDone && (
               <circle r="44" fill={`url(#rg-${a.id})`} opacity="0.5" />
             )}
 
-            {/* Outer ring */}
             <circle r="30"
               fill={isDone ? a.color + '18' : isActive ? a.color + '12' : C.bg1}
               stroke={col}
@@ -434,7 +247,6 @@ function DAGPipeline({ activeIdx, doneIdxs }) {
               style={isActive ? { filter: `drop-shadow(0 0 8px ${a.color})` } : {}}
             />
 
-            {/* Spinning dashed ring for active */}
             {isActive && (
               <circle r="37" fill="none"
                 stroke={a.color} strokeWidth="1.5"
@@ -444,27 +256,23 @@ function DAGPipeline({ activeIdx, doneIdxs }) {
               />
             )}
 
-            {/* Icon / checkmark */}
             <text textAnchor="middle" dominantBaseline="central"
               style={{ fontSize: 16, fill: col, fontWeight: 700,
                 filter: isDone || isActive ? `drop-shadow(0 0 4px ${a.color})` : 'none' }}>
               {isDone ? '✓' : a.icon}
             </text>
 
-            {/* Label */}
             <text textAnchor="middle" y="46"
               style={{ fontSize: 10, fill: col, fontWeight: isActive ? 700 : 400,
                 textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               {a.name}
             </text>
 
-            {/* Temp badge */}
             <text textAnchor="middle" y="59"
               style={{ fontSize: 9, fill: C.textMuted, fontFamily: 'monospace' }}>
               t={a.temp}
             </text>
 
-            {/* Step number */}
             <text textAnchor="middle" y="-40"
               style={{ fontSize: 9, fill: isPending ? C.textMuted + '60' : col + 'aa', fontFamily: 'monospace' }}>
               0{i + 1}
@@ -511,12 +319,10 @@ function AgentCard({ agent, isActive, isDone, output, expanded, onToggle }) {
       transition: 'border-color 0.3s, box-shadow 0.3s',
       boxShadow: isActive ? `0 0 24px ${col}18` : 'none',
     }}>
-      {/* Header row */}
       <div
         onClick={isDone ? onToggle : undefined}
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: isDone ? 'pointer' : 'default' }}
       >
-        {/* Status circle */}
         <div style={{
           width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
           background: isDone ? col + '20' : isActive ? col + '12' : C.bg2,
@@ -555,14 +361,19 @@ function AgentCard({ agent, isActive, isDone, output, expanded, onToggle }) {
         )}
       </div>
 
-      {/* Progress bar */}
+      {/* Indeterminate shimmer bar while running */}
       {isActive && (
-        <div style={{ height: 2, background: C.bg2 }}>
-          <div style={{ height: '100%', background: `linear-gradient(90deg,${col},${col}60)`, animation: `progressFill ${agent.delayMs}ms linear forwards` }} />
+        <div style={{ height: 2, background: C.bg2, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            width: '100%',
+            background: `linear-gradient(90deg, transparent 0%, ${col} 50%, transparent 100%)`,
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.4s ease-in-out infinite',
+          }} />
         </div>
       )}
 
-      {/* Expanded output */}
       {expanded && isDone && output && (
         <div style={{ padding: '16px 20px', borderTop: `1px solid ${C.border}`, background: C.bg, animation: 'fadeUp 0.25s ease-out' }}>
           <MD text={output} />
@@ -597,7 +408,6 @@ function CompletionView({ output, elapsed, tokens, cost }) {
       animation: 'fadeUp 0.5s ease-out',
       boxShadow: `0 0 40px ${C.green}12`,
     }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
@@ -627,7 +437,6 @@ function CompletionView({ output, elapsed, tokens, cost }) {
         </button>
       </div>
 
-      {/* Final output panel */}
       <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '20px 22px', maxHeight: 520, overflowY: 'auto' }}>
         <MD text={output} />
       </div>
@@ -647,9 +456,19 @@ export default function App() {
   const [tokens,     setTokens]     = useState(0)
   const [cost,       setCost]       = useState(0)
   const [finalOut,   setFinalOut]   = useState('')
+  const [error,      setError]      = useState('')
+  const [provider,   setProvider]   = useState('…')
 
-  const timerRef   = useRef(null)
-  const startRef   = useRef(null)
+  const timerRef  = useRef(null)
+  const startRef  = useRef(null)
+
+  // Fetch provider info on mount
+  useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(d => setProvider((d.provider || 'unknown').toUpperCase()))
+      .catch(() => setProvider('OFFLINE'))
+  }, [])
 
   // Elapsed-time ticker
   useEffect(() => {
@@ -667,7 +486,7 @@ export default function App() {
     if (!input.trim() || phase === 'running') return
 
     setPhase('running')
-    setActiveIdx(0)
+    setActiveIdx(-1)
     setDoneIdxs([])
     setOutputs({})
     setExpanded({})
@@ -675,47 +494,99 @@ export default function App() {
     setTokens(0)
     setCost(0)
     setFinalOut('')
+    setError('')
     startRef.current = Date.now()
 
-    let cumTok = 0, cumCost = 0
+    try {
+      const resp = await fetch('/api/run/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: input.trim() }),
+      })
 
-    for (let i = 0; i < AGENTS.length; i++) {
-      const a = AGENTS[i]
-      setActiveIdx(i)
-      await new Promise(r => setTimeout(r, a.delayMs))
-
-      cumTok  += a.tokIn + a.tokOut
-      cumCost += (a.tokIn / 1000) * 0.003 + (a.tokOut / 1000) * 0.015
-
-      setOutputs(p => ({ ...p, [a.id]: MOCK[a.id] }))
-      setDoneIdxs(p => [...p, i])
-      setTokens(cumTok)
-      setCost(cumCost)
-
-      // Auto-expand newly finished agent, collapse previous after short delay
-      setExpanded(p => ({ ...p, [a.id]: true }))
-      if (i > 0) {
-        const prevId = AGENTS[i - 1].id
-        setTimeout(() => setExpanded(p => ({ ...p, [prevId]: false })), 900)
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}))
+        throw new Error(errBody.error || `HTTP ${resp.status}`)
       }
-    }
 
-    setActiveIdx(-1)
-    setFinalOut(MOCK.executor)
-    setPhase('complete')
+      const reader  = resp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (!raw) continue
+
+          let ev
+          try { ev = JSON.parse(raw) } catch { continue }
+
+          if (ev.type === 'task_started') {
+            const idx = AGENTS.findIndex(a => a.id === ev.agent_type)
+            if (idx >= 0) setActiveIdx(idx)
+
+          } else if (ev.type === 'task_completed') {
+            const idx = AGENTS.findIndex(a => a.id === ev.agent_type)
+            if (idx >= 0) {
+              const agentId = ev.agent_type
+              setOutputs(p => ({ ...p, [agentId]: ev.full_output }))
+              setDoneIdxs(p => p.includes(idx) ? p : [...p, idx])
+              if (ev.cumulative_tokens) setTokens(ev.cumulative_tokens)
+              if (ev.cumulative_cost)   setCost(ev.cumulative_cost)
+              setExpanded(p => ({ ...p, [agentId]: true }))
+              if (idx > 0) {
+                const prevId = AGENTS[idx - 1].id
+                setTimeout(() => setExpanded(p => ({ ...p, [prevId]: false })), 900)
+              }
+            }
+
+          } else if (ev.type === 'workflow_complete') {
+            const m = ev.token_metrics || {}
+            setTokens((m.total_input_tokens || 0) + (m.total_output_tokens || 0))
+            setCost(m.estimated_cost || 0)
+            setFinalOut(ev.final_output || '')
+            setActiveIdx(-1)
+            setPhase('complete')
+
+          } else if (ev.type === 'error') {
+            throw new Error(ev.message || 'Workflow failed')
+          }
+        }
+      }
+    } catch (err) {
+      setError(
+        err.message.includes('fetch')
+          ? 'Cannot reach the backend. Make sure the server is running: python3 -m backend.api.server'
+          : err.message
+      )
+      setPhase('idle')
+      setActiveIdx(-1)
+    }
   }
 
   const reset = () => {
     setPhase('idle'); setActiveIdx(-1); setDoneIdxs([])
     setOutputs({}); setExpanded({}); setElapsed(0)
-    setTokens(0); setCost(0); setFinalOut('')
+    setTokens(0); setCost(0); setFinalOut(''); setError('')
   }
 
   const toggleExpanded = id => setExpanded(p => ({ ...p, [id]: !p[id] }))
 
+  const providerColor = provider === 'ANTHROPIC' ? C.cyan
+                      : provider === 'OPENAI'    ? C.green
+                      : provider === 'OFFLINE'   ? C.red
+                      : C.textMuted
+
   return (
     <>
-      {/* Inject keyframes */}
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
 
       <div style={{ minHeight: '100vh', background: C.bg, paddingBottom: 80 }}>
@@ -744,11 +615,10 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {/* Provider badge */}
-            <div style={{ fontSize: 10, color: C.textMuted, background: C.bg2, border: `1px solid ${C.border}`, padding: '4px 10px', borderRadius: 20, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-              MOCK PROVIDER
+            {/* Live provider badge */}
+            <div style={{ fontSize: 10, color: providerColor, background: C.bg2, border: `1px solid ${providerColor}40`, padding: '4px 10px', borderRadius: 20, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+              {provider} PROVIDER
             </div>
-            {/* Status dot */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{
                 width: 8, height: 8, borderRadius: '50%',
@@ -798,7 +668,7 @@ export default function App() {
             value={input}
             onChange={e => setInput(e.target.value)}
             disabled={phase === 'running'}
-            placeholder={"Describe your workflow in natural language…\n\nExample: Research the latest AI trends, write a comprehensive report for C-suite executives, review it for accuracy, then prepare the final deliverable."}
+            placeholder={"Describe your workflow in natural language…\n\nExample: Research the latest fashion trends, write a blog post for a fashion magazine, review it for accuracy and style, then produce the final publication-ready version."}
             onFocus={e  => e.target.style.borderColor = C.cyan}
             onBlur={e   => e.target.style.borderColor = input ? C.borderHi : C.border}
             style={{
@@ -811,6 +681,19 @@ export default function App() {
               marginBottom: 12,
             }}
           />
+
+          {/* Error banner */}
+          {error && (
+            <div style={{
+              background: C.red + '12', border: `1px solid ${C.red}50`,
+              borderRadius: 8, padding: '11px 16px', marginBottom: 16,
+              fontSize: 13, color: C.red, animation: 'fadeUp 0.2s ease-out',
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+            }}>
+              <span style={{ flexShrink: 0 }}>⚠</span>
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* Run button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 28 }}>

@@ -1,11 +1,14 @@
 """Flask REST API for the AI Workflow Orchestrator."""
 import sys
 import os
+import json
+import queue
+import threading
 
 # Add the project root to path for proper imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response, stream_with_context
 
 from backend.orchestrator.engine import WorkflowEngine
 from backend.orchestrator.llm_client import LLMClient
@@ -190,6 +193,78 @@ def quick_run():
         "token_metrics": state.token_metrics.to_dict(),
         "task_count": len(state.dag.tasks) if state.dag else 0,
     })
+
+
+@app.route("/api/run/stream", methods=["POST", "OPTIONS"])
+def stream_run():
+    """Stream workflow execution as Server-Sent Events.
+
+    Each SSE event is a JSON object with a 'type' field:
+      decomposition_complete  — DAG built
+      task_started            — agent beginning work
+      task_completed          — agent finished (includes full_output)
+      workflow_complete       — all done (includes final_output + metrics)
+      error                   — something went wrong
+    """
+    # Handle CORS pre-flight
+    if request.method == "OPTIONS":
+        resp = Response()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        return resp
+
+    data = request.get_json(silent=True) or {}
+    user_input, err = _validate_input(data)
+    if err:
+        return err
+
+    event_queue: queue.Queue = queue.Queue()
+
+    def run_in_thread():
+        try:
+            def callback(event_type, event_data):
+                event_queue.put({"type": event_type, **event_data})
+
+            engine = WorkflowEngine(llm_client=LLMClient(), event_callback=callback)
+            state = engine.run(user_input)
+            _workflows[state.workflow_id] = state
+            final_output = engine.get_final_output(state)
+            event_queue.put({
+                "type": "workflow_complete",
+                "workflow_id": state.workflow_id,
+                "status": state.status.value,
+                "final_output": final_output or "",
+                "token_metrics": state.token_metrics.to_dict(),
+            })
+        except Exception as exc:
+            event_queue.put({"type": "error", "message": str(exc)})
+        finally:
+            event_queue.put(None)  # sentinel — close stream
+
+    threading.Thread(target=run_in_thread, daemon=True).start()
+
+    def generate():
+        while True:
+            try:
+                event = event_queue.get(timeout=300)
+            except queue.Empty:
+                yield "data: {\"type\": \"heartbeat\"}\n\n"
+                continue
+            if event is None:
+                break
+            yield f"data: {json.dumps(event)}\n\n"
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Access-Control-Allow-Origin": "*",
+    }
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers=headers,
+    )
 
 
 if __name__ == "__main__":
