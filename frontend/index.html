@@ -1,12 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Workflow Orchestrator</title>
+    <title>Weave — Multi-Agent AI Workflows</title>
+    <meta name="description" content="Weave turns a single sentence into a parallel multi-agent workflow. Research, write, review, and deliver — all at once." />
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { background: #060c1a; min-height: 100vh; }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html { color-scheme: dark light; }
+      html[data-theme="dark"]  { background: #0c0f1a; }
+      html[data-theme="light"] { background: #f4f6ff; }
+      body { min-height: 100vh; }
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #2a3a6a; border-radius: 4px; }
     </style>
   </head>
   <body>
