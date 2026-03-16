@@ -1,24 +1,22 @@
 """Task decomposition engine — breaks user input into a DAG of subtasks."""
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from .llm_client import LLMClient, LLMError
-from .models import AgentType, DAG, Task
+from .models import AgentType, CustomAgentDefinition, DAG, Task
 
-
-class DecompositionError(Exception):
-    """Raised when workflow decomposition fails."""
-    pass
-
-
-DECOMPOSITION_SYSTEM_PROMPT = """You are an expert workflow architect. Your task is to analyze a user's workflow request and decompose it into 2-8 discrete subtasks that can be executed by specialized AI agents.
-
-Available agent types:
+_BUILTIN_AGENTS_SECTION = """\
+Available built-in agent types:
 - researcher: Gathers information, analyzes data, and synthesizes findings
 - writer: Creates, drafts, and refines written content
 - reviewer: Reviews, fact-checks, and provides quality assessments
-- executor: Executes final delivery, formatting, and output preparation
+- executor: Executes final delivery, formatting, and output preparation"""
+
+_SYSTEM_PROMPT_BASE = """\
+You are an expert workflow architect. Your task is to analyze a user's workflow request and decompose it into 2-8 discrete subtasks that can be executed by specialized AI agents.
+
+{agents_section}
 
 Rules:
 1. Create between 2 and 8 tasks (inclusive)
@@ -26,29 +24,57 @@ Rules:
 3. Dependencies must reference valid task IDs that come before the dependent task
 4. The task graph must be a valid DAG (no cycles)
 5. Assign the most appropriate agent type to each task
+6. Prefer parallel execution: tasks that don't depend on each other should have no dependency listed
 
 Return ONLY a valid JSON object with this exact structure:
-{
+{{
   "workflow_name": "Short descriptive name",
   "tasks": [
-    {
+    {{
       "id": "task_1",
       "description": "Detailed description of what this task does",
-      "agent_type": "researcher|writer|reviewer|executor",
+      "agent_type": "researcher|writer|reviewer|executor{custom_agent_ids}",
       "depends_on": [],
       "expected_output": "What the task should produce"
-    }
+    }}
   ]
-}
+}}
 
 Do not include any text outside the JSON object."""
+
+
+class DecompositionError(Exception):
+    """Raised when workflow decomposition fails."""
+    pass
 
 
 class DecompositionEngine:
     """Decomposes natural language workflow requests into executable DAGs."""
 
-    def __init__(self, llm_client: LLMClient):
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        custom_agents: Optional[List[CustomAgentDefinition]] = None,
+    ):
         self.llm_client = llm_client
+        self.custom_agents = custom_agents or []
+
+    def _build_system_prompt(self) -> str:
+        agents_section = _BUILTIN_AGENTS_SECTION
+        custom_ids_str = ""
+
+        if self.custom_agents:
+            custom_lines = "\n".join(
+                f"- {a.id}: {a.name} — custom agent"
+                for a in self.custom_agents
+            )
+            agents_section += "\n\nAdditional custom agent types:\n" + custom_lines
+            custom_ids_str = "|" + "|".join(a.id for a in self.custom_agents)
+
+        return _SYSTEM_PROMPT_BASE.format(
+            agents_section=agents_section,
+            custom_agent_ids=custom_ids_str,
+        )
 
     def decompose(self, user_input: str) -> DAG:
         """Break down user input into a DAG of subtasks."""
@@ -62,7 +88,7 @@ class DecompositionEngine:
         try:
             result = self.llm_client.complete(
                 messages=messages,
-                system=DECOMPOSITION_SYSTEM_PROMPT,
+                system=self._build_system_prompt(),
                 temperature=0.3,
                 max_tokens=2048,
             )
@@ -73,7 +99,8 @@ class DecompositionEngine:
         dag_data = self._parse_json(content)
         dag = self._build_dag(dag_data)
 
-        errors = dag.validate()
+        custom_ids = [a.id for a in self.custom_agents]
+        errors = dag.validate(custom_agent_ids=custom_ids)
         if errors:
             raise DecompositionError(f"Invalid DAG: {'; '.join(errors)}")
 
@@ -81,13 +108,11 @@ class DecompositionEngine:
 
     def _parse_json(self, content: str) -> Dict[str, Any]:
         """Parse JSON from LLM response, handling markdown fences and mixed text."""
-        # Try direct parse first
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             pass
 
-        # Strip markdown code fences
         fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", content)
         if fenced:
             try:
@@ -95,7 +120,6 @@ class DecompositionEngine:
             except json.JSONDecodeError:
                 pass
 
-        # Extract JSON object from mixed text
         obj_match = re.search(r"\{[\s\S]*\}", content)
         if obj_match:
             try:
@@ -111,17 +135,21 @@ class DecompositionEngine:
             raise DecompositionError("Missing 'tasks' field in decomposition response")
 
         workflow_name = data.get("workflow_name", "Unnamed Workflow")
+        valid_custom_ids = {a.id for a in self.custom_agents}
         tasks = []
 
         for task_data in data["tasks"]:
             try:
                 agent_type_str = task_data.get("agent_type", "researcher")
                 try:
-                    agent_type = AgentType(agent_type_str)
+                    agent_type: Any = AgentType(agent_type_str)
                 except ValueError:
-                    raise DecompositionError(
-                        f"Invalid agent type '{agent_type_str}' for task '{task_data.get('id')}'"
-                    )
+                    if agent_type_str in valid_custom_ids:
+                        agent_type = agent_type_str  # custom agent ID
+                    else:
+                        raise DecompositionError(
+                            f"Invalid agent type '{agent_type_str}' for task '{task_data.get('id')}'"
+                        )
 
                 task = Task(
                     id=task_data["id"],

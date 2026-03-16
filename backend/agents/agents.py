@@ -1,8 +1,8 @@
 """Specialized AI agents for the workflow orchestrator."""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ..orchestrator.llm_client import LLMClient
-from ..orchestrator.models import AgentType
+from ..orchestrator.models import AgentType, CustomAgentDefinition
 
 
 RESEARCHER_PROMPT = """You are a meticulous research analyst with deep expertise in information synthesis. Your role is to:
@@ -76,13 +76,29 @@ AGENT_PROMPTS = {
 
 
 class BaseAgent:
-    """Base class for all specialized agents."""
+    """Base class for all agents — both built-in and custom."""
 
-    def __init__(self, agent_type: AgentType, llm_client: LLMClient):
+    def __init__(
+        self,
+        agent_type: Union[AgentType, str],
+        llm_client: LLMClient,
+        custom_def: Optional[CustomAgentDefinition] = None,
+    ):
         self.agent_type = agent_type
         self.llm_client = llm_client
-        self.temperature = AGENT_TEMPERATURES[agent_type]
-        self.system_prompt = AGENT_PROMPTS[agent_type]
+
+        if custom_def is not None:
+            # Custom agent: use provided definition
+            self.temperature = custom_def.temperature
+            self.system_prompt = custom_def.system_prompt
+        elif isinstance(agent_type, AgentType):
+            # Built-in agent
+            self.temperature = AGENT_TEMPERATURES[agent_type]
+            self.system_prompt = AGENT_PROMPTS[agent_type]
+        else:
+            raise ValueError(
+                f"Custom agent '{agent_type}' requires a CustomAgentDefinition."
+            )
 
     def execute(
         self,
@@ -92,7 +108,9 @@ class BaseAgent:
         expected_output: str = "",
     ) -> Dict[str, Any]:
         """Execute the task and return result with content, summary, and usage."""
-        messages = self._build_messages(task_description, original_intent, context_chain, expected_output)
+        messages = self._build_messages(
+            task_description, original_intent, context_chain, expected_output
+        )
 
         result = self.llm_client.complete(
             messages=messages,
@@ -146,7 +164,6 @@ class BaseAgent:
         """Create a brief summary by truncating content (no extra LLM call)."""
         if not content:
             return ""
-        # Clean up the content and truncate
         lines = content.strip().split("\n")
         summary_lines = []
         char_count = 0
@@ -154,7 +171,6 @@ class BaseAgent:
             line = line.strip()
             if not line:
                 continue
-            # Skip markdown headers for summary, keep first substantive content
             if char_count + len(line) <= max_chars:
                 summary_lines.append(line)
                 char_count += len(line) + 1
@@ -166,8 +182,21 @@ class BaseAgent:
         return " ".join(summary_lines)[:max_chars]
 
 
-def create_agent(agent_type: AgentType, llm_client: LLMClient) -> BaseAgent:
-    """Factory function to create the appropriate agent for a given type."""
-    if not isinstance(agent_type, AgentType):
-        raise ValueError(f"Invalid agent type: {agent_type}. Must be an AgentType enum value.")
-    return BaseAgent(agent_type=agent_type, llm_client=llm_client)
+def create_agent(
+    agent_type: Union[AgentType, str],
+    llm_client: LLMClient,
+    custom_def: Optional[CustomAgentDefinition] = None,
+) -> BaseAgent:
+    """Factory: create the appropriate agent for a given type.
+
+    For custom agents (string agent_type), a CustomAgentDefinition must be provided.
+    """
+    if isinstance(agent_type, AgentType):
+        return BaseAgent(agent_type=agent_type, llm_client=llm_client)
+    if isinstance(agent_type, str):
+        if custom_def is None:
+            raise ValueError(
+                f"Custom agent '{agent_type}' requires a CustomAgentDefinition."
+            )
+        return BaseAgent(agent_type=agent_type, llm_client=llm_client, custom_def=custom_def)
+    raise ValueError(f"Invalid agent type: {agent_type}")

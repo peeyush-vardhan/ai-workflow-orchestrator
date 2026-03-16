@@ -1,9 +1,10 @@
 """Data models for the AI Workflow Orchestrator."""
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 class AgentType(Enum):
@@ -31,10 +32,39 @@ class WorkflowStatus(Enum):
 
 
 @dataclass
+class CustomAgentDefinition:
+    """User-defined agent with a custom system prompt and temperature."""
+    id: str
+    name: str
+    system_prompt: str
+    temperature: float = 0.5
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "system_prompt": self.system_prompt,
+            "temperature": self.temperature,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "CustomAgentDefinition":
+        return cls(
+            id=d["id"],
+            name=d["name"],
+            system_prompt=d["system_prompt"],
+            temperature=float(d.get("temperature", 0.5)),
+            created_at=d.get("created_at", datetime.utcnow().isoformat()),
+        )
+
+
+@dataclass
 class Task:
     id: str
     description: str
-    agent_type: AgentType
+    agent_type: Union[AgentType, str]  # str for custom agent IDs
     depends_on: List[str] = field(default_factory=list)
     expected_output: str = ""
     status: TaskStatus = TaskStatus.PENDING
@@ -51,10 +81,13 @@ class Task:
         return None
 
     def to_dict(self) -> Dict[str, Any]:
+        agent_type_val = (
+            self.agent_type.value if isinstance(self.agent_type, AgentType) else self.agent_type
+        )
         return {
             "id": self.id,
             "description": self.description,
-            "agent_type": self.agent_type.value,
+            "agent_type": agent_type_val,
             "depends_on": self.depends_on,
             "expected_output": self.expected_output,
             "status": self.status.value,
@@ -65,6 +98,27 @@ class Task:
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "duration_seconds": self.duration_seconds,
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Task":
+        agent_type_str = d["agent_type"]
+        try:
+            agent_type: Union[AgentType, str] = AgentType(agent_type_str)
+        except ValueError:
+            agent_type = agent_type_str  # custom agent ID
+        return cls(
+            id=d["id"],
+            description=d["description"],
+            agent_type=agent_type,
+            depends_on=d.get("depends_on", []),
+            expected_output=d.get("expected_output", ""),
+            status=TaskStatus(d.get("status", "pending")),
+            output=d.get("output"),
+            error=d.get("error"),
+            token_usage=d.get("token_usage", {}),
+            started_at=datetime.fromisoformat(d["started_at"]) if d.get("started_at") else None,
+            completed_at=datetime.fromisoformat(d["completed_at"]) if d.get("completed_at") else None,
+        )
 
 
 @dataclass
@@ -79,7 +133,7 @@ class DAG:
         return None
 
     def get_execution_order(self) -> List[Task]:
-        """Topological sort of tasks based on dependencies."""
+        """Topological sort of tasks based on dependencies (flat list)."""
         in_degree = {task.id: 0 for task in self.tasks}
         adjacency: Dict[str, List[str]] = {task.id: [] for task in self.tasks}
 
@@ -89,7 +143,7 @@ class DAG:
                 in_degree[task.id] += 1
 
         queue = [task for task in self.tasks if in_degree[task.id] == 0]
-        result = []
+        result: List[Task] = []
 
         while queue:
             current = queue.pop(0)
@@ -103,9 +157,43 @@ class DAG:
 
         return result
 
-    def validate(self) -> List[str]:
+    def get_execution_waves(self) -> List[List[Task]]:
+        """Group tasks into parallel execution waves.
+
+        All tasks within a wave have their dependencies satisfied by prior waves
+        and can be executed concurrently. Pause checks happen between waves.
+        """
+        in_degree = {task.id: 0 for task in self.tasks}
+        adjacency: Dict[str, List[str]] = {task.id: [] for task in self.tasks}
+
+        for task in self.tasks:
+            for dep_id in task.depends_on:
+                if dep_id in adjacency:
+                    adjacency[dep_id].append(task.id)
+                in_degree[task.id] += 1
+
+        waves: List[List[Task]] = []
+        remaining = {task.id for task in self.tasks}
+
+        while remaining:
+            wave_ids = {tid for tid in remaining if in_degree[tid] == 0}
+            if not wave_ids:
+                break  # cycle guard — should not happen after validate()
+            wave = [self.get_task(tid) for tid in sorted(wave_ids)]
+            waves.append([t for t in wave if t is not None])
+            for task in wave:
+                if task is None:
+                    continue
+                remaining.discard(task.id)
+                for neighbor_id in adjacency[task.id]:
+                    in_degree[neighbor_id] -= 1
+
+        return waves
+
+    def validate(self, custom_agent_ids: Optional[List[str]] = None) -> List[str]:
         """Validate the DAG. Returns list of error messages."""
         errors = []
+        valid_custom = set(custom_agent_ids or [])
 
         if len(self.tasks) < 1:
             errors.append("DAG must have at least 1 task")
@@ -118,12 +206,16 @@ class DAG:
                 if dep_id not in task_ids:
                     errors.append(f"Task '{task.id}' depends on non-existent task '{dep_id}'")
 
-            if not isinstance(task.agent_type, AgentType):
-                errors.append(f"Task '{task.id}' has invalid agent type")
+            if isinstance(task.agent_type, AgentType):
+                pass  # valid built-in
+            elif isinstance(task.agent_type, str) and task.agent_type in valid_custom:
+                pass  # valid custom agent
+            else:
+                errors.append(f"Task '{task.id}' has invalid agent type: {task.agent_type}")
 
         # Cycle detection via DFS
-        visited = set()
-        rec_stack = set()
+        visited: set = set()
+        rec_stack: set = set()
 
         def has_cycle(node_id: str) -> bool:
             visited.add(node_id)
@@ -152,6 +244,11 @@ class DAG:
             "workflow_name": self.workflow_name,
             "tasks": [task.to_dict() for task in self.tasks],
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "DAG":
+        tasks = [Task.from_dict(t) for t in d.get("tasks", [])]
+        return cls(workflow_name=d["workflow_name"], tasks=tasks)
 
 
 @dataclass
@@ -185,6 +282,14 @@ class TokenMetrics:
             "per_task_breakdown": self.per_task_breakdown,
         }
 
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "TokenMetrics":
+        tm = cls()
+        tm.total_input_tokens = d.get("total_input_tokens", 0)
+        tm.total_output_tokens = d.get("total_output_tokens", 0)
+        tm.per_task_breakdown = d.get("per_task_breakdown", {})
+        return tm
+
 
 @dataclass
 class WorkflowState:
@@ -200,6 +305,10 @@ class WorkflowState:
     completed_at: Optional[datetime] = None
     events: List[Dict[str, Any]] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # Thread lock for parallel task execution — excluded from serialization
+        self._lock: threading.Lock = threading.Lock()
+
     def add_event(self, event_type: str, data: Optional[Dict[str, Any]] = None) -> None:
         event = {
             "type": event_type,
@@ -209,13 +318,14 @@ class WorkflowState:
         self.events.append(event)
 
     def add_context(self, task_id: str, agent_type: str, summary: str, full_output: str) -> None:
-        self.context_chain.append({
-            "task_id": task_id,
-            "agent_type": agent_type,
-            "summary": summary,
-            "full_output": full_output,
-            "timestamp": datetime.utcnow().isoformat(),
-        })
+        with self._lock:
+            self.context_chain.append({
+                "task_id": task_id,
+                "agent_type": agent_type,
+                "summary": summary,
+                "full_output": full_output,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -231,3 +341,22 @@ class WorkflowState:
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "events": self.events,
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "WorkflowState":
+        state = cls(
+            user_input=d["user_input"],
+            workflow_id=d["workflow_id"],
+            status=WorkflowStatus(d["status"]),
+            current_task_id=d.get("current_task_id"),
+            context_chain=d.get("context_chain", []),
+            error_log=d.get("error_log", []),
+            events=d.get("events", []),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            completed_at=datetime.fromisoformat(d["completed_at"]) if d.get("completed_at") else None,
+        )
+        if d.get("dag"):
+            state.dag = DAG.from_dict(d["dag"])
+        if d.get("token_metrics"):
+            state.token_metrics = TokenMetrics.from_dict(d["token_metrics"])
+        return state
