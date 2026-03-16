@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weave — Platform Flow Diagram</title>
+<style>
+  :root {
+    --bg0: #0c0f1a;
+    --bg1: #131726;
+    --bg2: #1a2035;
+    --bg3: #222840;
+    --border: #2e3a5a;
+    --text: #e2e8f8;
+    --muted: #6b7aa0;
+    --primary: #7c6cf8;
+    --accent: #06b6d4;
+    --green: #10d98a;
+    --orange: #f59e42;
+    --red: #f05a5a;
+    --yellow: #fbbf24;
+    --phase-auth: #7c6cf8;
+    --phase-nav: #3b82f6;
+    --phase-run: #06b6d4;
+    --phase-exec: #10d98a;
+    --phase-out: #f59e42;
+    --phase-admin: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg0); color: var(--text); font-family: 'Inter', system-ui, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 24px; background: var(--bg1); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .logo { font-size: 20px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+  .logo span { color: var(--text); }
+  header h1 { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .tabs { display: flex; gap: 4px; margin-left: auto; }
+  .tab { padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .tab:hover:not(.active) { border-color: var(--primary); color: var(--text); }
+
+  /* Canvas area */
+  #canvas-wrap { flex: 1; overflow: hidden; position: relative; }
+  .view { position: absolute; inset: 0; overflow: hidden; display: none; }
+  .view.active { display: block; }
+
+  /* Pan/Zoom canvas */
+  .pan-container { width: 100%; height: 100%; overflow: auto; cursor: grab; }
+  .pan-container:active { cursor: grabbing; }
+  .diagram { position: relative; }
+
+  /* Node styles */
+  .node {
+    position: absolute;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--bg2);
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s, transform 0.1s;
+    min-width: 140px;
+    text-align: center;
+    user-select: none;
+    z-index: 2;
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .node.selected { box-shadow: 0 0 0 2px var(--primary), 0 8px 24px rgba(124,108,248,0.3); border-color: var(--primary) !important; }
+  .node.dimmed { opacity: 0.2; }
+  .node-icon { font-size: 20px; line-height: 1; margin-bottom: 5px; }
+  .node-label { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .node-sub { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+  .node-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Phase colors */
+  .phase-auth .node-badge { background: rgba(124,108,248,0.2); color: var(--phase-auth); }
+  .phase-auth { border-color: rgba(124,108,248,0.35) !important; }
+  .phase-nav .node-badge { background: rgba(59,130,246,0.2); color: var(--phase-nav); }
+  .phase-nav { border-color: rgba(59,130,246,0.35) !important; }
+  .phase-run .node-badge { background: rgba(6,182,212,0.2); color: var(--phase-run); }
+  .phase-run { border-color: rgba(6,182,212,0.35) !important; }
+  .phase-exec .node-badge { background: rgba(16,217,138,0.2); color: var(--phase-exec); }
+  .phase-exec { border-color: rgba(16,217,138,0.35) !important; }
+  .phase-out .node-badge { background: rgba(245,158,66,0.2); color: var(--phase-out); }
+  .phase-out { border-color: rgba(245,158,66,0.35) !important; }
+  .phase-admin .node-badge { background: rgba(168,85,247,0.2); color: var(--phase-admin); }
+  .phase-admin { border-color: rgba(168,85,247,0.35) !important; }
+
+  /* SVG arrows */
+  #arrows-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+
+  /* Detail panel */
+  #detail-panel {
+    position: fixed;
+    top: 60px;
+    right: -420px;
+    width: 400px;
+    bottom: 48px;
+    background: var(--bg1);
+    border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-radius: 12px 0 0 0;
+    padding: 24px;
+    overflow-y: auto;
+    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+  }
+  #detail-panel.open { right: 0; }
+  #panel-close { position: absolute; top: 16px; right: 16px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: all 0.15s; }
+  #panel-close:hover { background: var(--border); color: var(--text); }
+  .panel-icon { font-size: 32px; margin-bottom: 12px; }
+  .panel-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .panel-phase { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+  .panel-section { margin-bottom: 16px; }
+  .panel-section h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 8px; }
+  .panel-section p, .panel-section li { font-size: 13px; color: var(--text); line-height: 1.6; }
+  .panel-section ul { padding-left: 16px; }
+  .panel-section li { margin-bottom: 2px; }
+  .panel-files { display: flex; flex-wrap: wrap; gap: 6px; }
+  .file-chip { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-family: monospace; color: var(--accent); }
+  .io-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; margin-bottom: 4px; }
+  .io-label { width: 40px; flex-shrink: 0; font-weight: 600; color: var(--muted); font-size: 10px; text-transform: uppercase; padding-top: 2px; }
+  .io-val { color: var(--text); }
+  .connected-nodes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .conn-chip { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; transition: all 0.1s; }
+  .conn-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* Legend */
+  #legend {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 44px;
+    background: var(--bg1);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 24px;
+    z-index: 50;
+    font-size: 11px;
+  }
+  .legend-label { color: var(--muted); font-weight: 600; margin-right: 4px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-line-solid { width: 24px; height: 2px; background: var(--muted); }
+  .legend-line-dashed { width: 24px; height: 2px; background: repeating-linear-gradient(90deg, var(--muted) 0, var(--muted) 4px, transparent 4px, transparent 8px); }
+  .legend-sep { width: 1px; height: 20px; background: var(--border); }
+  #zoom-controls { margin-left: auto; display: flex; gap: 6px; }
+  .zoom-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 5px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; transition: all 0.1s; }
+  .zoom-btn:hover { border-color: var(--primary); color: var(--primary); }
+  #zoom-level { font-size: 11px; color: var(--muted); padding: 0 6px; }
+
+  /* Tech view */
+  .tech-diagram { padding: 32px; display: flex; flex-direction: column; gap: 16px; min-height: 100%; }
+  .tech-layer { border: 1px solid var(--border); border-radius: 12px; background: var(--bg1); overflow: hidden; }
+  .tech-layer-header { padding: 12px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+  .tech-layer-title { font-size: 13px; font-weight: 700; }
+  .tech-layer-sub { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .tech-layer-badge { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tech-cards { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px 20px; }
+  .tech-card { background: var(--bg2); border: 1.5px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 160px; flex: 1; cursor: pointer; transition: all 0.15s; }
+  .tech-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+  .tech-card.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(124,108,248,0.3); }
+  .tech-card-icon { font-size: 18px; margin-bottom: 6px; }
+  .tech-card-name { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+  .tech-card-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .data-flow-arrows { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; }
+  .flow-arrow { font-size: 16px; color: var(--border); }
+
+  /* Animate SVG dashes */
+  @keyframes dash { to { stroke-dashoffset: -20; } }
+  .anim-dash { animation: dash 1s linear infinite; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg0); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⬡ Weave<span></span></div>
+  <h1>Platform Flow Diagram</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="switchView('product')">🗺 Product Journey</button>
+    <button class="tab" onclick="switchView('tech')">⚙ Technical Architecture</button>
+  </div>
+</header>
+
+<!-- Product Journey View -->
+<div id="view-product" class="view active">
+  <div class="pan-container" id="pan-product">
+    <div class="diagram" id="diagram-product" style="width:1200px;height:1700px;">
+      <svg id="arrows-svg"></svg>
+    </div>
+  </div>
+</div>
+
+<!-- Technical Architecture View -->
+<div id="view-tech" class="view">
+  <div class="pan-container" id="pan-tech">
+    <div class="tech-diagram" id="tech-diagram" style="width:1100px;margin:0 auto;"></div>
+  </div>
+</div>
+
+<!-- Detail Panel -->
+<div id="detail-panel">
+  <button id="panel-close" onclick="closePanel()">✕</button>
+  <div id="panel-content"></div>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <span class="legend-label">Phase:</span>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-auth)"></div><span>Auth</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-nav)"></div><span>Navigation</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-run)"></div><span>Run</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-exec)"></div><span>Execute</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-out)"></div><span>Output</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--phase-admin)"></div><span>Admin</span></div>
+  <div class="legend-sep"></div>
+  <div class="legend-item"><div class="legend-line-solid"></div><span>Main flow</span></div>
+  <div class="legend-item"><div class="legend-line-dashed"></div><span>Optional</span></div>
+  <div id="zoom-controls">
+    <button class="zoom-btn" onclick="adjustZoom(-0.15)">−</button>
+    <span id="zoom-level">100%</span>
+    <button class="zoom-btn" onclick="adjustZoom(0.15)">+</button>
+    <button class="zoom-btn" title="Fit" onclick="resetZoom()">⊞</button>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+
+const PRODUCT_NODES = [
+  // Auth phase
+  { id: 'landing', x: 490, y: 30, icon: '🌐', label: 'Landing Page', sub: 'First visit', badge: 'Auth', phase: 'auth',
+    what: 'The entry point for all users. A clean dark page with the Weave logo, a short tagline, and an email input field.',
+    ux: 'User sees the login screen immediately. There is only one action: enter your email address. No sign-up required — accounts are created on first login.',
+    tech: 'React SPA served by Vite dev server (port 5173). Checks localStorage for a valid JWT on mount. If token exists, skips to Home.',
+    files: ['frontend/src/App.jsx#LandingPage'],
+    inputs: ['Browser request'],
+    outputs: ['Email address → OTP request'],
+    connected: ['otp-request'] },
+
+  { id: 'otp-request', x: 490, y: 170, icon: '📧', label: 'Request OTP', sub: 'POST /api/auth/email/request', badge: 'Auth', phase: 'auth',
+    what: 'User submits their email. Backend generates a 6-digit numeric OTP, stores a SHA-256 hash with 10-minute TTL in SQLite, and sends the code via Resend.',
+    ux: 'Submit button shows a spinner. On success, the form transitions to the code entry step. In dev mode, the code is also shown in the API response.',
+    tech: 'Flask route in auth.py. OTP stored as SHA-256 hash (never plaintext). Resend API called with Bearer token. DEV_MODE=true also returns dev_code in JSON.',
+    files: ['backend/api/auth.py#email_request_otp', 'backend/orchestrator/storage.py#save_otp'],
+    inputs: ['email: string'],
+    outputs: ['{ status: "otp_sent", email, dev_code? }', 'Email sent via Resend'],
+    connected: ['landing', 'resend', 'otp-verify'] },
+
+  { id: 'resend', x: 760, y: 170, icon: '✉️', label: 'Resend API', sub: 'Email delivery', badge: 'Auth', phase: 'auth',
+    what: 'Third-party transactional email service. Delivers the OTP code to the user\'s inbox with a branded HTML template.',
+    ux: 'User receives an email from onboarding@resend.dev with subject "Your Weave login code". The 6-digit code is displayed in large font.',
+    tech: 'POST https://api.resend.com/emails with Authorization: Bearer <RESEND_API_KEY>. Sender is onboarding@resend.dev until weave.ai domain is verified.',
+    files: ['backend/api/auth.py#_send_otp_email', '.env#RESEND_API_KEY'],
+    inputs: ['to: email', 'code: 6-digit string'],
+    outputs: ['HTTP 200 → email delivered'],
+    connected: ['otp-request', 'otp-verify'] },
+
+  { id: 'otp-verify', x: 490, y: 310, icon: '🔐', label: 'Verify OTP', sub: 'POST /api/auth/email/verify', badge: 'Auth', phase: 'auth',
+    what: 'User types the 6-digit code. Backend verifies hash match and TTL, upserts the user record, logs the login event, and issues a JWT.',
+    ux: 'Large digit input box. Auto-submits on 6th digit. On failure shows inline error. On success the whole page transitions to the Home dashboard.',
+    tech: 'Hash compare with SHA-256. User upserted in users table (email as unique key). JWT payload: {sub, email, is_admin, iat, exp}. Token stored in localStorage.',
+    files: ['backend/api/auth.py#email_verify_otp', 'backend/orchestrator/storage.py#verify_otp', 'backend/orchestrator/storage.py#upsert_user'],
+    inputs: ['email: string', 'code: string'],
+    outputs: ['{ token: JWT, user: {id, email, name, is_admin} }'],
+    connected: ['otp-request', 'jwt-store'] },
+
+  { id: 'jwt-store', x: 490, y: 450, icon: '💾', label: 'JWT Stored', sub: 'localStorage', badge: 'Auth', phase: 'auth',
+    what: 'The JWT is persisted in browser localStorage. On every subsequent page load, the token is read and /api/auth/me is called to validate and restore session.',
+    ux: 'User is now logged in. The session persists across browser restarts for 7 days. After expiry, they are redirected back to the landing page.',
+    tech: 'localStorage.setItem("token", jwt). App.jsx useEffect reads token on mount, calls /api/auth/me. Token attached to all API calls via Authorization: Bearer header.',
+    files: ['frontend/src/App.jsx#useEffect', 'backend/api/auth.py#auth_me'],
+    inputs: ['JWT string'],
+    outputs: ['Persistent session', 'User object in React state'],
+    connected: ['otp-verify', 'home'] },
+
+  // Nav phase
+  { id: 'home', x: 490, y: 590, icon: '🏠', label: 'Home Dashboard', sub: 'Workflow gallery', badge: 'Navigation', phase: 'nav',
+    what: 'Central hub showing a gallery of past workflow runs. Each card shows workflow name, status badge (pending/running/completed/failed), creation time, and a rerun button.',
+    ux: 'Dark grid layout. Top bar has navigation links (Home, History, Agents, Settings) and user avatar. Empty state shows a prompt to run the first workflow.',
+    tech: 'GET /api/workflows returns paginated list from SQLite. React state management via useState hooks. Status colors: green=completed, yellow=running, red=failed.',
+    files: ['frontend/src/App.jsx#HomeView', 'backend/api/server.py#list_workflows'],
+    inputs: ['GET /api/workflows (authenticated)'],
+    outputs: ['Workflow list displayed', 'Navigation to Run/History'],
+    connected: ['jwt-store', 'run-input', 'history', 'agents', 'settings'] },
+
+  { id: 'history', x: 220, y: 590, icon: '📋', label: 'History View', sub: 'Past runs', badge: 'Navigation', phase: 'nav',
+    what: 'Full list of past workflow executions with filters by status and date. Each row links to the full run workspace for that workflow.',
+    ux: 'Table view with sortable columns. Click any row to open the run details. Rerun button re-submits with original parameters. Save as template option.',
+    tech: 'GET /api/workflows with status/date filters. POST /api/workflows/<id>/rerun creates new run copying the original DAG structure.',
+    files: ['frontend/src/App.jsx#HistoryView', 'backend/api/server.py#rerun_workflow'],
+    inputs: ['GET /api/workflows'],
+    outputs: ['Workflow detail navigation'],
+    connected: ['home', 'run-workspace'] },
+
+  { id: 'agents', x: 760, y: 590, icon: '🤖', label: 'Agents Builder', sub: 'Custom agents', badge: 'Navigation', phase: 'nav',
+    what: 'CRUD interface for creating custom AI agent definitions. Users can define new agent types with custom system prompts, names, and descriptions.',
+    ux: 'Card grid of existing agents. "New Agent" button opens a form with fields: name, description, system prompt. Agents appear in the decomposer during workflow creation.',
+    tech: 'GET/POST/PUT/DELETE /api/agents. Custom agents stored in custom_agents SQLite table. Decomposer reads custom agent list and injects names into Claude system prompt.',
+    files: ['frontend/src/App.jsx#AgentsView', 'backend/api/server.py#agents_crud', 'backend/orchestrator/decomposer.py'],
+    inputs: ['Agent name, description, system_prompt'],
+    outputs: ['Custom agent definition stored', 'Available in future decompositions'],
+    connected: ['home', 'decompose'] },
+
+  { id: 'settings', x: 1000, y: 590, icon: '⚙️', label: 'Settings', sub: 'Profile & prefs', badge: 'Navigation', phase: 'nav',
+    what: 'User profile settings: display name, theme toggle (dark/light), export preferences. Admin users also see a link to the Admin dashboard.',
+    ux: 'Simple form layout. Theme change is instant (CSS variable swap). Admin badge shown in header for admin users.',
+    tech: 'Theme stored in localStorage. PUT /api/auth/me for profile updates. Admin flag from JWT is_admin claim.',
+    files: ['frontend/src/App.jsx#SettingsView'],
+    inputs: ['User preferences'],
+    outputs: ['Updated profile', 'Theme applied'],
+    connected: ['home', 'admin'] },
+
+  // Run phase
+  { id: 'run-input', x: 490, y: 730, icon: '✏️', label: 'Workflow Input', sub: 'Natural language prompt', badge: 'Run', phase: 'run',
+    what: 'The main workflow creation form. User types a natural language description of what they want to accomplish. Optionally upload a file for context.',
+    ux: 'Large textarea with placeholder examples. Submit button triggers the full pipeline. The form transitions to the live run workspace on submission.',
+    tech: 'POST /api/run/stream body: {input: string, files?: [...]}. SSE connection opened immediately. The user input is the sole trigger for the entire DAG generation.',
+    files: ['frontend/src/App.jsx#RunForm', 'backend/api/server.py#run_stream'],
+    inputs: ['user_input: natural language string', 'optional: file attachments'],
+    outputs: ['SSE stream initiated', 'Workflow ID created'],
+    connected: ['home', 'decompose', 'run-workspace'] },
+
+  { id: 'decompose', x: 490, y: 870, icon: '🧠', label: 'LLM Decomposition', sub: 'Claude builds the DAG', badge: 'Run', phase: 'run',
+    what: 'Claude (claude-opus-4-6) receives the user prompt and generates a structured JSON DAG: a list of tasks with agent assignments, dependencies, and descriptions.',
+    ux: 'User sees "Analyzing your request..." with a pulsing indicator. The DAG visualization appears on screen as soon as decomposition completes.',
+    tech: 'Decomposer builds system prompt listing all available agents (built-in + custom). Claude responds with JSON. Parsed into Task/DAG dataclasses. Topological sort validates DAG.',
+    files: ['backend/orchestrator/decomposer.py', 'backend/orchestrator/models.py#DAG', 'backend/agents/agents.py'],
+    inputs: ['user_input', 'available_agents list', 'custom_agent_definitions'],
+    outputs: ['DAG: {workflow_name, tasks: [{id, description, agent_type, depends_on}]}'],
+    connected: ['run-input', 'dag-viz', 'execute'] },
+
+  { id: 'dag-viz', x: 760, y: 870, icon: '🕸', label: 'DAG Visualization', sub: 'Live dependency graph', badge: 'Run', phase: 'run',
+    what: 'A real-time visual graph of the task dependency structure. Nodes are tasks, edges are dependencies. Node colors indicate status.',
+    ux: 'Nodes: grey=pending, blue=running, green=completed, red=failed. Animates as execution progresses. Clicking a node shows task details.',
+    tech: 'DAG data sent via SSE {type: "dag", dag: {...}}. React renders SVG-based graph using absolute positioning. Node positions calculated by topological level.',
+    files: ['frontend/src/App.jsx#DAGViz', 'backend/api/server.py#run_stream'],
+    inputs: ['SSE dag event'],
+    outputs: ['Interactive DAG SVG in UI'],
+    connected: ['decompose', 'run-workspace'] },
+
+  // Execute phase
+  { id: 'run-workspace', x: 490, y: 1010, icon: '🖥', label: 'Run Workspace', sub: 'Live execution view', badge: 'Execute', phase: 'exec',
+    what: 'The primary workspace during execution. Left panel: DAG graph. Right panel: streaming agent outputs in real-time. Top: overall progress bar.',
+    ux: 'Mission-control aesthetic. Each agent output streams in with typewriter effect. Pause/Resume button. Download output button.',
+    tech: 'SSE EventSource on /api/run/stream. Events: {type: dag|token|task_start|task_end|done|error}. React state updated on each event.',
+    files: ['frontend/src/App.jsx#RunWorkspace', 'backend/api/server.py#run_stream'],
+    inputs: ['SSE stream', 'DAG state'],
+    outputs: ['Live output display', 'Pause/Resume controls'],
+    connected: ['dag-viz', 'execute', 'pause', 'export'] },
+
+  { id: 'execute', x: 490, y: 1150, icon: '⚡', label: 'Wave Execution', sub: 'Parallel agent runs', badge: 'Execute', phase: 'exec',
+    what: 'The orchestration engine groups tasks into "waves" — sets of tasks whose dependencies are all satisfied. Each wave runs tasks in parallel using a thread pool.',
+    ux: 'Multiple agent output panels appear simultaneously when parallel tasks run. Progress counter shows "3/7 tasks complete".',
+    tech: 'DAG.get_execution_waves() uses Kahn\'s algorithm. ThreadPoolExecutor(max_workers=8). Thread-local SQLite connections (WAL mode). WorkflowState._lock protects shared metrics.',
+    files: ['backend/orchestrator/engine.py', 'backend/orchestrator/models.py#get_execution_waves'],
+    inputs: ['DAG with execution waves', 'WorkflowState'],
+    outputs: ['SSE token/task_start/task_end events', 'Completed task outputs'],
+    connected: ['run-workspace', 'agent-exec', 'pause'] },
+
+  { id: 'agent-exec', x: 760, y: 1150, icon: '🤖', label: 'Agent Execution', sub: 'Specialized AI agents', badge: 'Execute', phase: 'exec',
+    what: 'Each task is handled by a specialized agent (Researcher, Writer, Analyst, Critic, Planner, Developer, Custom). Agents receive task context + upstream outputs.',
+    ux: 'Each agent\'s output streams into its own panel with the agent type icon and task description as the header.',
+    tech: 'BaseAgent.run() calls LLM with agent-specific system prompt. Context includes all completed upstream task outputs. Streaming via Anthropic SDK stream=True.',
+    files: ['backend/agents/agents.py', 'backend/orchestrator/engine.py#execute_task'],
+    inputs: ['task: Task', 'context: dict (upstream outputs)', 'llm_client'],
+    outputs: ['Streamed tokens → SSE', 'Final task.output string'],
+    connected: ['execute', 'llm'] },
+
+  { id: 'llm', x: 1000, y: 1150, icon: '🔮', label: 'LLM Client', sub: 'Claude / GPT-4 / Mock', badge: 'Execute', phase: 'exec',
+    what: 'Abstraction layer over multiple LLM providers. Primary: Anthropic Claude (claude-opus-4-6). Fallback: OpenAI GPT-4. Dev: Mock client returning canned responses.',
+    ux: 'Transparent to user. Model selection visible in admin stats.',
+    tech: 'AnthropicClient/OpenAIClient/MockClient behind common interface. ANTHROPIC_API_KEY env var. Streaming via SDK. Token counts tracked per run.',
+    files: ['backend/agents/agents.py#LLMClient'],
+    inputs: ['system_prompt', 'messages', 'stream=True'],
+    outputs: ['Token stream', 'usage: {input_tokens, output_tokens}'],
+    connected: ['agent-exec'] },
+
+  { id: 'pause', x: 220, y: 1150, icon: '⏸', label: 'Human-in-the-Loop', sub: 'Pause / edit / resume', badge: 'Execute', phase: 'exec',
+    what: 'At any wave boundary, the user can pause execution. A banner shows the last completed task output in an editable textarea. User can edit the output then resume.',
+    ux: 'Pause button in header turns orange when execution is paused. Yellow "Paused" banner appears with the task output editable. Resume or Abort buttons.',
+    tech: '_command_queues[wf_id]: Queue. Pause sets WorkflowState.paused=True. SSE loop checks at wave boundary. Resume command carries edited_output back to engine.',
+    files: ['backend/api/server.py#run_stream', 'frontend/src/App.jsx#PauseBanner'],
+    inputs: ['Pause button click', 'Edited task output (optional)'],
+    outputs: ['Execution halted at wave boundary', 'Resumed with patched context'],
+    connected: ['execute', 'run-workspace'] },
+
+  // Output phase
+  { id: 'export', x: 490, y: 1310, icon: '📤', label: 'Export Output', sub: 'MD / PDF / DOCX', badge: 'Output', phase: 'out',
+    what: 'Download the complete workflow output as a formatted document. Three formats: Markdown (raw), PDF (styled, with colors), DOCX (Word-compatible).',
+    ux: 'Export dropdown button in Run Workspace header. Click a format to download immediately. File named after workflow slug.',
+    tech: 'GET /api/workflows/<id>/export?format=md|pdf|docx. PDF: fpdf2 (installed as fpdf). DOCX: python-docx. Markdown: raw string assembly.',
+    files: ['backend/api/export.py'],
+    inputs: ['workflow_id', 'format: md|pdf|docx'],
+    outputs: ['File download: <slug>.md / .pdf / .docx'],
+    connected: ['run-workspace', 'template'] },
+
+  { id: 'template', x: 760, y: 1310, icon: '📌', label: 'Save as Template', sub: 'Reusable workflow', badge: 'Output', phase: 'out',
+    what: 'Save a completed workflow as a template for future reuse. Templates preserve the DAG structure, agent assignments, and original prompt.',
+    ux: '"Save Template" button in the run workspace. Templates appear in the home gallery under a "Templates" tab with a ⚡ quick-run button.',
+    tech: 'POST /api/workflows/<id>/save-template. Stored in templates SQLite table. Template run: POST /api/templates/<id>/run with new user_input.',
+    files: ['backend/api/server.py#save_template', 'backend/orchestrator/storage.py#templates'],
+    inputs: ['workflow_id', 'template_name (optional)'],
+    outputs: ['Template record in DB', 'Available in Home gallery'],
+    connected: ['run-workspace', 'export'] },
+
+  // Admin phase
+  { id: 'admin', x: 490, y: 1470, icon: '🛡', label: 'Admin Dashboard', sub: 'Admin users only', badge: 'Admin', phase: 'admin',
+    what: 'Restricted portal for admin users (identified by is_admin JWT claim, set based on ADMIN_EMAIL env var). Shows platform-wide analytics and user management.',
+    ux: 'Accessible via Settings → Admin Dashboard link (only visible to admin). Full-page dashboard with 4 sections.',
+    tech: '_require_admin decorator on all endpoints checks JWT is_admin claim. Four endpoints: /api/admin/stats, /api/admin/users, /api/admin/workflows, /api/admin/audit-log.',
+    files: ['backend/api/admin.py', 'frontend/src/App.jsx#AdminView'],
+    inputs: ['JWT with is_admin=true'],
+    outputs: ['Stats, user list, workflow list, audit log'],
+    connected: ['settings', 'admin-stats', 'admin-users', 'audit'] },
+
+  { id: 'admin-stats', x: 220, y: 1470, icon: '📊', label: 'Platform Stats', sub: '/api/admin/stats', badge: 'Admin', phase: 'admin',
+    what: 'Aggregated platform metrics: total users, total workflows, success rate, total tokens consumed, estimated cost, daily active users chart (last 30 days).',
+    ux: 'KPI cards at top, line chart below showing daily workflow runs over time.',
+    tech: 'SQL aggregations over workflows/users tables. Cost estimate: token count × model pricing. Daily chart: GROUP BY date(created_at).',
+    files: ['backend/api/admin.py#admin_stats'],
+    inputs: ['GET /api/admin/stats (admin JWT)'],
+    outputs: ['{ total_users, total_workflows, success_rate, tokens, cost, daily_chart }'],
+    connected: ['admin'] },
+
+  { id: 'admin-users', x: 760, y: 1470, icon: '👥', label: 'User Management', sub: '/api/admin/users', badge: 'Admin', phase: 'admin',
+    what: 'Full user roster with per-user stats. Columns: email, name, provider, workflow count, last active, admin flag.',
+    ux: 'Sortable table. Admin can inspect any user\'s workflow history.',
+    tech: 'JOIN users LEFT JOIN workflows. Returns workflow_count per user. Paginated.',
+    files: ['backend/api/admin.py#admin_users'],
+    inputs: ['GET /api/admin/users (admin JWT)'],
+    outputs: ['User list with workflow counts'],
+    connected: ['admin'] },
+
+  { id: 'audit', x: 1000, y: 1470, icon: '📜', label: 'Audit Log', sub: '/api/admin/audit-log', badge: 'Admin', phase: 'admin',
+    what: 'Immutable event log. Currently records: user_login events with provider and timestamp. Extensible to record any platform event.',
+    ux: 'Reverse-chronological event list. Event type, user, timestamp, details JSON.',
+    tech: 'audit_log SQLite table: id, event_type, user_id, details JSON, created_at. storage.log_event() called throughout the codebase.',
+    files: ['backend/api/admin.py#admin_audit_log', 'backend/orchestrator/storage.py#log_event'],
+    inputs: ['GET /api/admin/audit-log (admin JWT)'],
+    outputs: ['Event list: [{event_type, user_id, details, created_at}]'],
+    connected: ['admin'] },
+];
+
+const PRODUCT_EDGES = [
+  // Auth flow
+  { from: 'landing', to: 'otp-request', type: 'main' },
+  { from: 'otp-request', to: 'resend', type: 'side' },
+  { from: 'otp-request', to: 'otp-verify', type: 'main' },
+  { from: 'otp-verify', to: 'jwt-store', type: 'main' },
+  { from: 'jwt-store', to: 'home', type: 'main' },
+  // Nav
+  { from: 'home', to: 'run-input', type: 'main' },
+  { from: 'home', to: 'history', type: 'side' },
+  { from: 'home', to: 'agents', type: 'side' },
+  { from: 'home', to: 'settings', type: 'side' },
+  // Run
+  { from: 'run-input', to: 'decompose', type: 'main' },
+  { from: 'decompose', to: 'dag-viz', type: 'side' },
+  { from: 'decompose', to: 'execute', type: 'main' },
+  { from: 'dag-viz', to: 'run-workspace', type: 'side' },
+  { from: 'execute', to: 'run-workspace', type: 'main' },
+  // Execute
+  { from: 'execute', to: 'agent-exec', type: 'main' },
+  { from: 'execute', to: 'pause', type: 'optional' },
+  { from: 'agent-exec', to: 'llm', type: 'main' },
+  // Output
+  { from: 'run-workspace', to: 'export', type: 'optional' },
+  { from: 'run-workspace', to: 'template', type: 'optional' },
+  // Admin
+  { from: 'settings', to: 'admin', type: 'optional' },
+  { from: 'admin', to: 'admin-stats', type: 'side' },
+  { from: 'admin', to: 'admin-users', type: 'side' },
+  { from: 'admin', to: 'audit', type: 'side' },
+];
+
+const TECH_LAYERS = [
+  {
+    id: 'browser',
+    title: '🌐 Browser / React SPA',
+    sub: 'Port 5173 (Vite)',
+    badge: 'Frontend',
+    color: '#3b82f6',
+    cards: [
+      { id: 'react-app', icon: '⚛️', name: 'App.jsx', desc: '~1800 lines, single file. All views, state, routing via useState. Dark theme, inline CSS-in-JS.' },
+      { id: 'dag-render', icon: '🕸', name: 'DAG Renderer', desc: 'SVG-based dependency graph. Nodes positioned by topological level. Animated status colors.' },
+      { id: 'sse-client', icon: '📡', name: 'SSE EventSource', desc: 'Persistent streaming connection for live token output. Events: dag, token, task_start, task_end, done, error.' },
+      { id: 'auth-ui', icon: '🔐', name: 'Auth / JWT', desc: 'Email OTP form. JWT stored in localStorage. Authorization: Bearer header on all API calls.' },
+    ],
+    what: 'React 18 SPA built with Vite. All views rendered client-side. No page reloads. State managed with React hooks.',
+    tech: 'React 18, Vite 5, vanilla CSS-in-JS. No Redux, no React Router — view switching via simple state variable.',
+    files: ['frontend/src/App.jsx', 'frontend/index.html', 'frontend/package.json'],
+  },
+  {
+    id: 'api',
+    title: '🐍 Flask API Server',
+    sub: 'Port 5000',
+    badge: 'Backend',
+    color: '#06b6d4',
+    cards: [
+      { id: 'auth-bp', icon: '🔐', name: 'auth.py', desc: 'Email OTP endpoints. JWT generation/validation. Resend email integration. /api/auth/email/request, /verify, /me, /logout.' },
+      { id: 'server-bp', icon: '🚀', name: 'server.py', desc: '25+ endpoints: run/stream (SSE), workflows CRUD, templates, custom agents, pause/resume, export routing.' },
+      { id: 'admin-bp', icon: '🛡', name: 'admin.py', desc: 'Admin-gated: /api/admin/stats, /users, /workflows, /audit-log. JWT is_admin check.' },
+      { id: 'export-bp', icon: '📤', name: 'export.py', desc: 'Workflow export: MD (text), PDF (fpdf2), DOCX (python-docx). File download response.' },
+      { id: 'openapi-bp', icon: '📖', name: 'openapi_spec.py', desc: 'Self-hosted OpenAPI 3.0 spec at /api/openapi.json. Swagger UI at /api/docs.' },
+      { id: 'linkedin-bp', icon: '💼', name: 'linkedin.py', desc: 'LinkedIn OAuth integration. Post-to-LinkedIn export of workflow outputs.' },
+    ],
+    what: 'Flask 3 API server. Blueprints for clean separation. CORS enabled for localhost:5173.',
+    tech: 'Flask 3, python-jwt, flask-cors. Blueprints: auth_bp, export_bp, admin_bp, openapi_bp, linkedin_bp registered on main app.',
+    files: ['backend/api/server.py', 'backend/api/auth.py', 'backend/api/admin.py', 'backend/api/export.py'],
+  },
+  {
+    id: 'orchestration',
+    title: '⚡ Orchestration Core',
+    sub: 'DAG + Agents',
+    badge: 'Core',
+    color: '#10d98a',
+    cards: [
+      { id: 'decomposer', icon: '🧠', name: 'decomposer.py', desc: 'Sends user prompt to Claude with all agent names. Parses structured JSON DAG response. Validates topology.' },
+      { id: 'engine', icon: '⚡', name: 'engine.py', desc: 'Wave-based parallel execution. ThreadPoolExecutor(max_workers=8). Per-wave barrier. Pause cooperative at wave boundary.' },
+      { id: 'models', icon: '📐', name: 'models.py', desc: 'Dataclasses: Task, DAG, WorkflowState, CustomAgentDefinition. get_execution_waves() topological sort. _lock for thread safety.' },
+      { id: 'agents-py', icon: '🤖', name: 'agents.py', desc: 'BaseAgent + 6 built-in types: Researcher, Writer, Analyst, Critic, Planner, Developer. LLM client abstraction (Anthropic/OpenAI/Mock).' },
+    ],
+    what: 'Pure Python orchestration. No external workflow frameworks. Custom DAG, decomposition, and parallel execution engine.',
+    tech: 'dataclasses, ThreadPoolExecutor, Queue. Anthropic SDK for streaming. Kahn\'s algorithm for topological ordering.',
+    files: ['backend/orchestrator/decomposer.py', 'backend/orchestrator/engine.py', 'backend/orchestrator/models.py', 'backend/agents/agents.py'],
+  },
+  {
+    id: 'storage',
+    title: '🗃 SQLite Storage',
+    sub: 'WAL mode, thread-local connections',
+    badge: 'Persistence',
+    color: '#f59e42',
+    cards: [
+      { id: 'workflows-tbl', icon: '📋', name: 'workflows', desc: 'id, user_id, name, status, dag_json, user_input, created_at, updated_at. All workflow runs.' },
+      { id: 'users-tbl', icon: '👤', name: 'users', desc: 'id, email, name, provider, is_admin, avatar_url, created_at, last_active. Upserted on login.' },
+      { id: 'otps-tbl', icon: '🔢', name: 'otps', desc: 'email, code_hash (SHA-256), expires_at. Single-use, 10-minute TTL.' },
+      { id: 'custom-agents-tbl', icon: '🤖', name: 'custom_agents', desc: 'id, user_id, name, description, system_prompt. User-defined agent types.' },
+      { id: 'templates-tbl', icon: '📌', name: 'templates', desc: 'id, user_id, name, dag_json, user_input. Saved workflow templates.' },
+      { id: 'audit-log-tbl', icon: '📜', name: 'audit_log', desc: 'id, event_type, user_id, details (JSON), created_at. Immutable event stream.' },
+    ],
+    what: 'SQLite with WAL journal mode. Thread-local connections for concurrent access from ThreadPoolExecutor workers.',
+    tech: 'sqlite3 with WAL. threading.local() for connection per thread. StorageAdapter class in storage.py.',
+    files: ['backend/orchestrator/storage.py', '.env#DB_PATH'],
+  },
+  {
+    id: 'external',
+    title: '🌍 External Services',
+    sub: 'Third-party APIs',
+    badge: 'External',
+    color: '#a855f7',
+    cards: [
+      { id: 'anthropic-api', icon: '🔮', name: 'Anthropic API', desc: 'claude-opus-4-6 model. Used for DAG decomposition and all agent execution. Streaming enabled.' },
+      { id: 'resend-api', icon: '✉️', name: 'Resend', desc: 'Transactional email. Sends OTP login codes. Sender: onboarding@resend.dev (temporary until weave.ai domain verified).' },
+      { id: 'openai-api', icon: '🤖', name: 'OpenAI API (fallback)', desc: 'GPT-4 fallback when Anthropic key not set. Same interface as AnthropicClient.' },
+      { id: 'linkedin-api', icon: '💼', name: 'LinkedIn API', desc: 'OAuth2 for posting workflow outputs to LinkedIn. Optional integration.' },
+    ],
+    what: 'All external dependencies are optional except Anthropic (required for real execution). Mock client available for dev/testing.',
+    tech: 'Resend: POST https://api.resend.com/emails. Anthropic: anthropic Python SDK. All keys in .env.',
+    files: ['.env', 'backend/api/auth.py#_send_otp_email', 'backend/agents/agents.py#AnthropicClient'],
+  },
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
+let currentView = 'product';
+let selectedNode = null;
+let zoom = 1;
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildProductDiagram();
+  buildTechDiagram();
+  setupPanZoom('pan-product', 'diagram-product');
+  setupPanZoom('pan-tech', 'tech-diagram');
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+});
+
+// ─── BUILD PRODUCT DIAGRAM ────────────────────────────────────────────────────
+
+function buildProductDiagram() {
+  const diagram = document.getElementById('diagram-product');
+  const svg = document.getElementById('arrows-svg');
+
+  // Create nodes
+  PRODUCT_NODES.forEach(n => {
+    const el = document.createElement('div');
+    el.className = `node phase-${n.phase}`;
+    el.id = `node-${n.id}`;
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.innerHTML = `
+      <div class="node-icon">${n.icon}</div>
+      <div class="node-label">${n.label}</div>
+      <div class="node-sub">${n.sub}</div>
+      <div class="node-badge">${n.badge}</div>
+    `;
+    el.addEventListener('click', () => selectNode(n.id));
+    diagram.appendChild(el);
+  });
+
+  // Draw arrows after nodes are in DOM (need positions)
+  setTimeout(() => drawArrows(), 50);
+}
+
+function drawArrows() {
+  const svg = document.getElementById('arrows-svg');
+  const diagram = document.getElementById('diagram-product');
+  svg.innerHTML = '';
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+
+  // Arrowhead markers
+  const colors = { main: '#4a5580', side: '#3a4565', optional: '#2a3050' };
+  ['main', 'side', 'optional'].forEach(type => {
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', `arrow-${type}`);
+    marker.setAttribute('markerWidth', '8');
+    marker.setAttribute('markerHeight', '8');
+    marker.setAttribute('refX', '6');
+    marker.setAttribute('refY', '3');
+    marker.setAttribute('orient', 'auto');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M0,0 L0,6 L8,3 z');
+    path.setAttribute('fill', colors[type]);
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  PRODUCT_EDGES.forEach(edge => {
+    const fromEl = document.getElementById(`node-${edge.from}`);
+    const toEl = document.getElementById(`node-${edge.to}`);
+    if (!fromEl || !toEl) return;
+
+    const fr = fromEl.getBoundingClientRect();
+    const tr = toEl.getBoundingClientRect();
+    const dr = diagram.getBoundingClientRect();
+
+    const fx = fr.left - dr.left + fr.width / 2;
+    const fy = fr.top - dr.top + fr.height;
+    const tx = tr.left - dr.left + tr.width / 2;
+    const ty = tr.top - dr.top;
+
+    const dy = ty - fy;
+    const dx = tx - fx;
+    const cx1 = fx + dx * 0.2;
+    const cy1 = fy + dy * 0.5;
+    const cx2 = tx - dx * 0.2;
+    const cy2 = ty - dy * 0.5;
+
+    const strokeColor = { main: '#4a5580', side: '#3a4565', optional: '#2d3a5a' }[edge.type];
+    const strokeWidth = edge.type === 'main' ? '2' : '1.5';
+    const dashArray = edge.type === 'optional' ? '5,4' : edge.type === 'side' ? '3,3' : 'none';
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${fx},${fy} C${cx1},${cy1} ${cx2},${cy2} ${tx},${ty}`);
+    path.setAttribute('stroke', strokeColor);
+    path.setAttribute('stroke-width', strokeWidth);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('marker-end', `url(#arrow-${edge.type})`);
+    if (dashArray !== 'none') {
+      path.setAttribute('stroke-dasharray', dashArray);
+      if (edge.type === 'main') path.classList.add('anim-dash');
+    }
+    path.setAttribute('data-from', edge.from);
+    path.setAttribute('data-to', edge.to);
+    svg.appendChild(path);
+  });
+}
+
+// ─── BUILD TECH DIAGRAM ───────────────────────────────────────────────────────
+
+function buildTechDiagram() {
+  const container = document.getElementById('tech-diagram');
+
+  TECH_LAYERS.forEach((layer, i) => {
+    if (i > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'data-flow-arrows';
+      arrow.innerHTML = '<div class="flow-arrow">↕</div>';
+      container.appendChild(arrow);
+    }
+
+    const layerEl = document.createElement('div');
+    layerEl.className = 'tech-layer';
+    layerEl.style.borderColor = layer.color + '44';
+
+    layerEl.innerHTML = `
+      <div class="tech-layer-header" style="background: ${layer.color}11">
+        <span style="font-size:18px">${layer.title.split(' ')[0]}</span>
+        <div class="tech-layer-title" style="color:${layer.color}">${layer.title.substring(layer.title.indexOf(' ')+1)}</div>
+        <div class="tech-layer-badge" style="background:${layer.color}22;color:${layer.color}">${layer.badge}</div>
+        <span class="tech-layer-sub">${layer.sub}</span>
+      </div>
+      <div class="tech-cards" id="cards-${layer.id}"></div>
+    `;
+    container.appendChild(layerEl);
+
+    const cardsContainer = layerEl.querySelector(`#cards-${layer.id}`);
+    layer.cards.forEach(card => {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'tech-card';
+      cardEl.id = `tech-${card.id}`;
+      cardEl.innerHTML = `
+        <div class="tech-card-icon">${card.icon}</div>
+        <div class="tech-card-name">${card.name}</div>
+        <div class="tech-card-desc">${card.desc}</div>
+      `;
+      cardEl.addEventListener('click', () => selectTechCard(layer, card));
+      cardsContainer.appendChild(cardEl);
+    });
+  });
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+
+function selectNode(id) {
+  const node = PRODUCT_NODES.find(n => n.id === id);
+  if (!node) return;
+
+  if (selectedNode === id) {
+    closePanel();
+    return;
+  }
+
+  selectedNode = id;
+
+  // Update node styles
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.remove('selected', 'dimmed');
+  });
+
+  const connectedIds = new Set([id]);
+  PRODUCT_EDGES.forEach(e => {
+    if (e.from === id || e.to === id) {
+      connectedIds.add(e.from);
+      connectedIds.add(e.to);
+    }
+  });
+
+  document.querySelectorAll('.node').forEach(el => {
+    const nid = el.id.replace('node-', '');
+    if (!connectedIds.has(nid)) el.classList.add('dimmed');
+  });
+  document.getElementById(`node-${id}`).classList.add('selected');
+
+  // Highlight SVG edges
+  document.querySelectorAll('#arrows-svg path').forEach(p => {
+    const from = p.getAttribute('data-from');
+    const to = p.getAttribute('data-to');
+    p.style.opacity = (from === id || to === id) ? '1' : '0.15';
+  });
+
+  showPanel(node);
+}
+
+function selectTechCard(layer, card) {
+  document.querySelectorAll('.tech-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById(`tech-${card.id}`).classList.add('selected');
+
+  showTechPanel(layer, card);
+}
+
+function showPanel(node) {
+  const phaseColors = { auth: 'var(--phase-auth)', nav: 'var(--phase-nav)', run: 'var(--phase-run)', exec: 'var(--phase-exec)', out: 'var(--phase-out)', admin: 'var(--phase-admin)' };
+  const color = phaseColors[node.phase] || 'var(--muted)';
+
+  const connectedNodes = (node.connected || []).map(cid => {
+    const cn = PRODUCT_NODES.find(n => n.id === cid);
+    return cn ? `<span class="conn-chip" onclick="selectNode('${cid}')">${cn.icon} ${cn.label}</span>` : '';
+  }).join('');
+
+  const files = (node.files || []).map(f => `<div class="file-chip">${f}</div>`).join('');
+
+  document.getElementById('panel-content').innerHTML = `
+    <div class="panel-icon">${node.icon}</div>
+    <div class="panel-title">${node.label}</div>
+    <div class="panel-phase" style="color:${color}">${node.badge} Phase</div>
+    <div class="divider"></div>
+    <div class="panel-section">
+      <h4>What happens here</h4>
+      <p>${node.what}</p>
+    </div>
+    <div class="panel-section">
+      <h4>User Experience</h4>
+      <p>${node.ux}</p>
+    </div>
+    <div class="panel-section">
+      <h4>Technical Detail</h4>
+      <p>${node.tech}</p>
+    </div>
+    ${files ? `<div class="panel-section"><h4>Source Files</h4><div class="panel-files">${files}</div></div>` : ''}
+    <div class="divider"></div>
+    <div class="panel-section">
+      <h4>Inputs → Outputs</h4>
+      ${node.inputs.map(i => `<div class="io-row"><span class="io-label">IN</span><span class="io-val">${i}</span></div>`).join('')}
+      ${node.outputs.map(o => `<div class="io-row"><span class="io-label" style="color:var(--green)">OUT</span><span class="io-val">${o}</span></div>`).join('')}
+    </div>
+    ${connectedNodes ? `<div class="divider"></div><div class="panel-section"><h4>Connected Nodes</h4><div class="connected-nodes">${connectedNodes}</div></div>` : ''}
+  `;
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function showTechPanel(layer, card) {
+  const files = (layer.files || []).map(f => `<div class="file-chip">${f}</div>`).join('');
+
+  document.getElementById('panel-content').innerHTML = `
+    <div class="panel-icon">${card.icon}</div>
+    <div class="panel-title">${card.name}</div>
+    <div class="panel-phase" style="color:${layer.color}">${layer.title.split(' ').slice(1).join(' ')}</div>
+    <div class="divider"></div>
+    <div class="panel-section">
+      <h4>Component</h4>
+      <p>${card.desc}</p>
+    </div>
+    <div class="panel-section">
+      <h4>Layer Overview</h4>
+      <p>${layer.what}</p>
+    </div>
+    <div class="panel-section">
+      <h4>Technical Stack</h4>
+      <p>${layer.tech}</p>
+    </div>
+    ${files ? `<div class="panel-section"><h4>Key Files</h4><div class="panel-files">${files}</div></div>` : ''}
+  `;
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  selectedNode = null;
+  document.querySelectorAll('.node').forEach(el => {
+    el.classList.remove('selected', 'dimmed');
+  });
+  document.querySelectorAll('#arrows-svg path').forEach(p => {
+    p.style.opacity = '1';
+  });
+  document.querySelectorAll('.tech-card').forEach(el => el.classList.remove('selected'));
+}
+
+// ─── VIEW SWITCHING ────────────────────────────────────────────────────────────
+
+function switchView(view) {
+  currentView = view;
+  closePanel();
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelectorAll('.tab')[view === 'product' ? 0 : 1].classList.add('active');
+}
+
+// ─── PAN + ZOOM ───────────────────────────────────────────────────────────────
+
+function setupPanZoom(containerId, diagramId) {
+  const container = document.getElementById(containerId);
+  const diagram = document.getElementById(diagramId);
+  let isPanning = false, startX, startY, scrollX, scrollY;
+
+  container.addEventListener('mousedown', e => {
+    if (e.target.closest('.node') || e.target.closest('.tech-card')) return;
+    isPanning = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    scrollX = container.scrollLeft;
+    scrollY = container.scrollTop;
+    container.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isPanning) return;
+    container.scrollLeft = scrollX - (e.clientX - startX);
+    container.scrollTop = scrollY - (e.clientY - startY);
+  });
+
+  window.addEventListener('mouseup', () => {
+    isPanning = false;
+    container.style.cursor = 'grab';
+  });
+}
+
+function adjustZoom(delta) {
+  if (currentView !== 'product') return;
+  zoom = Math.max(0.4, Math.min(2, zoom + delta));
+  const diagram = document.getElementById('diagram-product');
+  diagram.style.transform = `scale(${zoom})`;
+  diagram.style.transformOrigin = 'top left';
+  diagram.style.width = (1200 * zoom) + 'px';
+  diagram.style.height = (1700 * zoom) + 'px';
+  document.getElementById('zoom-level').textContent = Math.round(zoom * 100) + '%';
+  setTimeout(() => drawArrows(), 50);
+}
+
+function resetZoom() {
+  zoom = 1;
+  const diagram = document.getElementById('diagram-product');
+  diagram.style.transform = '';
+  diagram.style.width = '1200px';
+  diagram.style.height = '1700px';
+  document.getElementById('zoom-level').textContent = '100%';
+  const container = document.getElementById('pan-product');
+  container.scrollLeft = 0;
+  container.scrollTop = 0;
+  setTimeout(() => drawArrows(), 50);
+}
+</script>
+</body>
+</html>
